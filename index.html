@@ -65,45 +65,63 @@
         let xrSession = null;
 
         async function startARSession() {
-            const homepage = document.getElementById("homepage");
-            const arMode = document.getElementById("ar-mode");
+            document.getElementById("homepage").style.display = "none";
+            document.getElementById("ar-mode").style.display = "flex";
 
-            if (!navigator.xr) {
-                alert("WebXR not supported.");
-                return;
-            }
+            if (navigator.xr) {
+                try {
+                    const supported = await navigator.xr.isSessionSupported('immersive-ar');
+                    if (!supported) throw new Error("AR is not supported");
 
-            try {
-                const supported = await navigator.xr.isSessionSupported('immersive-ar');
-                if (!supported) throw "AR not supported on this device.";
+                    xrSession = await navigator.xr.requestSession('immersive-ar');
+                    const gl = createWebGLContext();
 
-                homepage.style.display = "none";
-                arMode.style.display = "flex";
+                    xrSession.updateRenderState({
+                        baseLayer: new XRWebGLLayer(xrSession, gl) // ✅ Ensure correct rendering
+                    });
 
-                xrSession = await navigator.xr.requestSession('immersive-ar');
-                xrSession.addEventListener('end', exitARSession);
+                    xrSession.requestReferenceSpace('local').then((referenceSpace) => {
+                        function onXRFrame(t, frame) {
+                            const session = frame.session;
+                            const pose = frame.getViewerPose(referenceSpace);
+                            if (pose) {
+                                gl.clearColor(0.0, 0.0, 0.0, 1.0);
+                                gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+                                session.requestAnimationFrame(onXRFrame);
+                            }
+                        }
+                        session.requestAnimationFrame(onXRFrame);
+                    });
 
-                const gl = createWebGLContext();
-                xrSession.updateRenderState({ baseLayer: new XRWebGLLayer(xrSession, gl) });
-
-                const refSpace = await xrSession.requestReferenceSpace('local');
-                xrSession.requestAnimationFrame((t, frame) => onXRFrame(frame, refSpace, gl));
-            } catch (err) {
-                alert(err);
+                    xrSession.addEventListener('end', exitARSession);
+                } catch (err) {
+                    console.error("Error starting AR session:", err);
+                    alert(err);
+                    exitARSession();
+                }
+            } else {
+                alert("WebXR is not supported.");
                 exitARSession();
             }
         }
 
+
         function createWebGLContext() {
             const canvas = document.createElement('canvas');
-            document.getElementById("ar-mode").appendChild(canvas);
+            canvas.style.position = "absolute";
+            canvas.style.top = "0";
+            canvas.style.left = "0";
+            canvas.style.width = "100vw";
+            canvas.style.height = "100vh";
 
-            const gl = canvas.getContext('webgl', {xrCompatible: true}); // ✅ Ensure XR compatibility
+            const gl = canvas.getContext('webgl', { xrCompatible: true });
             if (!gl) {
                 alert("WebGL not supported.");
                 exitARSession();
                 return null;
             }
+
+            document.getElementById("ar-mode").appendChild(canvas); // Append to AR mode
             return gl;
         }
 
