@@ -106,8 +106,8 @@
                     if (supported) {
                         // Start the AR session
                         const session = await navigator.xr.requestSession('immersive-ar', {
-                            requiredFeatures: ['camera', 'hit-test'],  // Request camera and hit-testing (for placing AR objects)
-                            optionalFeatures: ['dom-overlay'],  // Optional feature: rendering content on top of the screen
+                            requiredFeatures: [],  // Request camera and hit-testing (for placing AR objects)
+                            optionalFeatures: [],  // Optional feature: rendering content on top of the screen
                         });
 
                         xrSession = session;
