@@ -97,10 +97,16 @@
         function createWebGLContext() {
             const canvas = document.createElement('canvas');
             document.getElementById("ar-mode").appendChild(canvas);
-            const gl = canvas.getContext('webgl', { alpha: true });
-            if (!gl) throw "WebGL not supported.";
+
+            const gl = canvas.getContext('webgl', {xrCompatible: true}); // ✅ Ensure XR compatibility
+            if (!gl) {
+                alert("WebGL not supported.");
+                exitARSession();
+                return null;
+            }
             return gl;
         }
+
 
         function onXRFrame(frame, refSpace, gl) {
             const session = frame.session;
@@ -116,10 +122,12 @@
                 xrSession.end();
                 xrSession = null;
             }
+
+            // Ensure homepage is visible and AR mode is hidden
             document.getElementById("homepage").style.display = "block";
             document.getElementById("ar-mode").style.display = "none";
-            document.querySelector('canvas')?.remove();
         }
+
 
         (async function checkWebXRSupport() {
             const arStatus = document.getElementById("ar-support-status");
