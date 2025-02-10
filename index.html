@@ -12,34 +12,21 @@
             background-color: #f0f8ff;
         }
 
-        /* Homepage container */
         #homepage {
             padding-top: 50px;
         }
 
-        /* AR mode container (hidden initially) */
         #ar-mode {
             display: none;
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
-            background-color: black;
+            inset: 0;
+            background: black;
             display: flex;
             align-items: center;
             justify-content: center;
             flex-direction: column;
         }
 
-        /* Video feed fills the screen */
-        #ar-mode video {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-
-        /* Button styling */
         button {
             background-color: #007bff;
             color: white;
@@ -51,142 +38,77 @@
             margin-top: 20px;
         }
 
-        button:hover {
-            background-color: #0056b3;
-        }
+        button:hover { background-color: #0056b3; }
+        button:disabled { background-color: #d6d6d6; cursor: not-allowed; }
 
-        button:disabled {
-            background-color: #d6d6d6; /* Light gray background */
-            color: #a1a1a1; /* Gray text */
-            border: 1px solid #cccccc; /* Light gray border */
-            cursor: not-allowed; /* Change cursor to indicate it's disabled */
-            opacity: 0.6; /* Slightly transparent appearance */
-        }
-
-        /* "Go Back" button */
         #exit-ar-btn {
             position: absolute;
             bottom: 20px;
             background-color: red;
-            z-index: 10; /* Ensure the button is on top of other elements */
         }
 
-
-        #exit-ar-btn:hover {
-            background-color: #8f1f1f;
-        }
+        #exit-ar-btn:hover { background-color: #8f1f1f; }
     </style>
 </head>
 <body>
-    <!-- AR Mode (Initially Hidden) -->
     <div id="ar-mode">
         <button id="exit-ar-btn" onclick="exitARSession()">Go Back</button>
     </div>
 
-    <!-- Homepage Content -->
     <div id="homepage">
         <h1>Welcome to My AR Webpage</h1>
         <p id="ar-support-status">Checking AR support...</p>
         <button id="ar-btn" onclick="startARSession()">Start AR Session</button>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script>
         let xrSession = null;
-        let camera, scene, renderer;
-        let cube;
 
         async function startARSession() {
-            document.getElementById("homepage").style.display = "none";
-            document.getElementById("ar-mode").style.display = "flex";
+            const homepage = document.getElementById("homepage");
+            const arMode = document.getElementById("ar-mode");
 
-            if (navigator.xr) {
-                try {
-                    const supported = await navigator.xr.isSessionSupported('immersive-ar');
-                    if (supported) {
-                        const session = await navigator.xr.requestSession('immersive-ar', {
-                            requiredFeatures: ['local', 'hit-test'], // Enable hit testing for placing objects
-                        });
+            if (!navigator.xr) {
+                alert("WebXR not supported.");
+                return;
+            }
 
-                        xrSession = session;
+            try {
+                const supported = await navigator.xr.isSessionSupported('immersive-ar');
+                if (!supported) throw "AR not supported on this device.";
 
-                        // Set up WebGL context and Three.js scene
-                        const gl = createWebGLContext();
+                homepage.style.display = "none";
+                arMode.style.display = "flex";
 
-                        // Create Three.js scene, camera, and renderer
-                        scene = new THREE.Scene();
-                        camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-                        renderer = new THREE.WebGLRenderer({ canvas: gl.canvas, context: gl });
-                        renderer.autoClear = false;
+                xrSession = await navigator.xr.requestSession('immersive-ar');
+                xrSession.addEventListener('end', exitARSession);
 
-                        // Add a simple 3D cube to the scene
-                        const geometry = new THREE.BoxGeometry(0.1, 0.1, 0.1); // Cube dimensions
-                        const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 }); // Green color
-                        cube = new THREE.Mesh(geometry, material);
-                        scene.add(cube);
+                const gl = createWebGLContext();
+                xrSession.updateRenderState({ baseLayer: new XRWebGLLayer(xrSession, gl) });
 
-                        // Bind the AR session to the WebGL context
-                        xrSession.updateRenderState({
-                            baseLayer: new XRWebGLLayer(xrSession, gl)
-                        });
-
-                        xrSession.requestReferenceSpace('local').then((referenceSpace) => {
-                            // Render loop
-                            function onXRFrame(t, frame) {
-                                const session = frame.session;
-                                const pose = frame.getViewerPose(referenceSpace);
-
-                                if (pose) {
-                                    // Clear the canvas and render the scene
-                                    gl.clearColor(0.0, 0.0, 0.0, 1.0);
-                                    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-
-                                    // Update the camera matrix
-                                    camera.matrix.fromArray(pose.views[0].transform.matrix);
-                                    camera.updateMatrixWorld(true);
-
-                                    // Render the scene using Three.js
-                                    renderer.render(scene, camera);
-
-                                    // Continue the animation loop
-                                    session.requestAnimationFrame(onXRFrame);
-                                }
-                            }
-
-                            // Start the animation loop
-                            xrSession.requestAnimationFrame(onXRFrame);
-                        });
-
-                        xrSession.addEventListener('end', exitARSession);
-                    } else {
-                        alert("AR is not supported on this device.");
-                        exitARSession();
-                    }
-                } catch (err) {
-                    console.error("Error starting AR session:", err);
-                    alert(err);
-                    exitARSession();
-                }
-            } else {
-                alert("WebXR is not supported on this device.");
+                const refSpace = await xrSession.requestReferenceSpace('local');
+                xrSession.requestAnimationFrame((t, frame) => onXRFrame(frame, refSpace, gl));
+            } catch (err) {
+                alert(err);
                 exitARSession();
             }
         }
 
-        // Create WebGL context to render AR content
         function createWebGLContext() {
             const canvas = document.createElement('canvas');
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
             document.getElementById("ar-mode").appendChild(canvas);
-
-            const gl = canvas.getContext('webgl', { alpha: true, xrCompatible: true });
-            if (!gl) {
-                alert("WebGL not supported on this device.");
-                exitARSession();
-            }
-
+            const gl = canvas.getContext('webgl', { alpha: true });
+            if (!gl) throw "WebGL not supported.";
             return gl;
+        }
+
+        function onXRFrame(frame, refSpace, gl) {
+            const session = frame.session;
+            const pose = frame.getViewerPose(refSpace);
+            if (pose) {
+                gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+                session.requestAnimationFrame((t, newFrame) => onXRFrame(newFrame, refSpace, gl));
+            }
         }
 
         function exitARSession() {
@@ -194,50 +116,30 @@
                 xrSession.end();
                 xrSession = null;
             }
-
-            const canvas = document.querySelector('canvas');
-            if (canvas) {
-                canvas.remove();
-            }
-
             document.getElementById("homepage").style.display = "block";
             document.getElementById("ar-mode").style.display = "none";
+            document.querySelector('canvas')?.remove();
         }
 
-        function checkWebXRSupport() {
-            const arSupportStatus = document.getElementById("ar-support-status"); // Get the <p> element
-            const cameraFeedBtn = document.getElementById("ar-btn"); // Get the button by ID
+        (async function checkWebXRSupport() {
+            const arStatus = document.getElementById("ar-support-status");
+            const arBtn = document.getElementById("ar-btn");
 
-            if (navigator.xr) {
-                console.log("WebXR is supported!");
-
-                // Check for AR support
-                navigator.xr.isSessionSupported('immersive-ar').then((supported) => {
-                    if (supported) {
-                        console.log("AR is supported!");
-                        arSupportStatus.textContent = '✅ AR is supported on this device!'; // Update <p> content
-                        cameraFeedBtn.disabled = false; // Enable the button if AR is supported
-                    } else {
-                        console.log("AR is NOT supported.");
-                        arSupportStatus.textContent = '❌ AR is not supported on this device.'; // Update <p> content
-                        cameraFeedBtn.disabled = true; // Disable the button if AR is not supported
-                    }
-                }).catch((err) => {
-                    console.error("Error checking AR support:", err);
-                    arSupportStatus.textContent = '❌ AR support check failed.'; // Update <p> content on error
-                    cameraFeedBtn.disabled = true; // Disable the button if there's an error
-                });
-
-            } else {
-                console.log("WebXR is NOT supported on this device.");
-                arSupportStatus.textContent = '❌ WebXR is not supported on this device.'; // Update <p> content
-                cameraFeedBtn.disabled = true; // Disable the button if WebXR is not supported
+            if (!navigator.xr) {
+                arStatus.textContent = '❌ WebXR is not supported.';
+                arBtn.disabled = true;
+                return;
             }
-        }
 
-        exitARSession();
-        checkWebXRSupport();
+            try {
+                const supported = await navigator.xr.isSessionSupported('immersive-ar');
+                arStatus.textContent = supported ? '✅ AR is supported!' : '❌ AR not supported.';
+                arBtn.disabled = !supported;
+            } catch {
+                arStatus.textContent = '❌ AR support check failed.';
+                arBtn.disabled = true;
+            }
+        })();
     </script>
-
 </body>
 </html>
