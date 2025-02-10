@@ -4,14 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Simple AR Webpage</title>
-    <script type="importmap">
-        {
-            "imports": {
-                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
-            }
-        }
-    </script>
     <style>
         body {
             margin: 0;
@@ -19,60 +11,130 @@
             text-align: center;
             background-color: #f0f8ff;
         }
-        #ar-mode { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: black; }
+
+        #homepage {
+            padding-top: 50px;
+        }
+
+        #ar-mode {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: black;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+        }
+
+        button {
+            background-color: #007bff;
+            color: white;
+            font-size: 18px;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
         #exit-ar-btn {
-            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
-            background-color: red; color: white; font-size: 18px; padding: 10px 20px;
-            border: none; border-radius: 5px; cursor: pointer;
+            position: absolute;
+            bottom: 20px;
+            background-color: red;
+        }
+
+        #exit-ar-btn:hover {
+            background-color: #8f1f1f;
         }
     </style>
 </head>
 <body>
+
     <div id="homepage">
         <h1>Welcome to My Simple AR Webpage</h1>
         <button id="ar-btn">Start AR Session</button>
     </div>
+
     <div id="ar-mode">
         <button id="exit-ar-btn">Go Back</button>
     </div>
+
     <script type="module">
         import * as THREE from 'three';
-        import { ARButton } from 'three/addons/webxr/ARButton.js';
 
         let renderer, scene, camera;
+        let xrSession = null;  // Store XR session
+
         const arMode = document.getElementById("ar-mode");
         const homepage = document.getElementById("homepage");
         const arBtn = document.getElementById("ar-btn");
         const exitBtn = document.getElementById("exit-ar-btn");
 
-        function startAR() {
-            homepage.style.display = "none";
-            arMode.style.display = "block";
-
-            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.xr.enabled = true;
-            arMode.appendChild(renderer.domElement);
-            document.body.appendChild(ARButton.createButton(renderer));
-
-            scene = new THREE.Scene();
-            camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
-            scene.add(new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1));
-
-            function animate() {
-                renderer.setAnimationLoop(() => {
-                    renderer.render(scene, camera);
-                });
+        async function startAR() {
+            if (!navigator.xr) {
+                alert("WebXR not supported on this device.");
+                return;
             }
-            animate();
+
+            try {
+                const supported = await navigator.xr.isSessionSupported('immersive-ar');
+                if (!supported) {
+                    alert("AR is not supported on this device.");
+                    return;
+                }
+
+                // Start the AR session
+                xrSession = await navigator.xr.requestSession('immersive-ar');
+
+                homepage.style.display = "none";
+                arMode.style.display = "block";
+
+                // Create Three.js renderer for AR mode
+                renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                renderer.xr.enabled = true;
+                arMode.appendChild(renderer.domElement);
+
+                scene = new THREE.Scene();
+                camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
+                scene.add(new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1));
+
+                xrSession.addEventListener("end", exitAR);
+
+                function renderLoop() {
+                    renderer.setAnimationLoop(() => {
+                        renderer.render(scene, camera);
+                    });
+                }
+
+                renderer.xr.setSession(xrSession);
+                renderLoop();
+
+            } catch (error) {
+                console.error("Failed to start AR session:", error);
+                alert("Error: " + error.message);
+            }
         }
 
         function exitAR() {
+            if (xrSession) {
+                xrSession.end();
+                xrSession = null;
+            }
+
             if (renderer) {
                 renderer.setAnimationLoop(null);
-                renderer.xr.getSession()?.end();
                 renderer.domElement.remove();
             }
+
             homepage.style.display = "block";
             arMode.style.display = "none";
         }
@@ -80,5 +142,6 @@
         arBtn.addEventListener("click", startAR);
         exitBtn.addEventListener("click", exitAR);
     </script>
+
 </body>
 </html>
