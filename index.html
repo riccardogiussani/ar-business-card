@@ -204,7 +204,39 @@
             document.getElementById("ar-mode").style.display = "none";
         }
 
+        function checkWebXRSupport() {
+            const arSupportStatus = document.getElementById("ar-support-status"); // Get the <p> element
+            const cameraFeedBtn = document.getElementById("ar-btn"); // Get the button by ID
+
+            if (navigator.xr) {
+                console.log("WebXR is supported!");
+
+                // Check for AR support
+                navigator.xr.isSessionSupported('immersive-ar').then((supported) => {
+                    if (supported) {
+                        console.log("AR is supported!");
+                        arSupportStatus.textContent = '✅ AR is supported on this device!'; // Update <p> content
+                        cameraFeedBtn.disabled = false; // Enable the button if AR is supported
+                    } else {
+                        console.log("AR is NOT supported.");
+                        arSupportStatus.textContent = '❌ AR is not supported on this device.'; // Update <p> content
+                        cameraFeedBtn.disabled = true; // Disable the button if AR is not supported
+                    }
+                }).catch((err) => {
+                    console.error("Error checking AR support:", err);
+                    arSupportStatus.textContent = '❌ AR support check failed.'; // Update <p> content on error
+                    cameraFeedBtn.disabled = true; // Disable the button if there's an error
+                });
+
+            } else {
+                console.log("WebXR is NOT supported on this device.");
+                arSupportStatus.textContent = '❌ WebXR is not supported on this device.'; // Update <p> content
+                cameraFeedBtn.disabled = true; // Disable the button if WebXR is not supported
+            }
+        }
+
         exitARSession();
+        checkWebXRSupport();
     </script>
 
 </body>
