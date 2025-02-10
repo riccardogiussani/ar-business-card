@@ -53,9 +53,9 @@
         import * as THREE from 'three';
         import { ARButton } from 'three/addons/webxr/ARButton.js';
 
-        let scene, camera, renderer;
-        let arButton;
+        let scene, camera, renderer, arButton;
 
+        // AR session and initialization
         function init() {
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -64,31 +64,37 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.xr.enabled = true;
 
-            // Create AR button for starting the session
-            arButton = ARButton.createButton(renderer, {
-                requiredFeatures: ['immersive-ar'],
-                onSessionStarted: () => {
-                    console.log('AR session started');
-                    document.getElementById('landing-page').style.display = 'none'; // Hide landing page
-                },
-                onSessionEnded: () => {
-                    console.log('AR session ended');
-                }
-            });
-
-            // Attach AR button
-            document.body.appendChild(arButton);
-
+            // Event listener for window resize
             window.addEventListener('resize', onWindowResize);
         }
 
+        // Handle window resizing
         function onWindowResize() {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
         }
 
-        function animate() {
+        // Start the AR session after button click
+        function startAR() {
+            // Remove the landing page
+            document.getElementById('landing-page').style.display = 'none';
+
+            // Create the AR button for starting the session
+            arButton = ARButton.createButton(renderer, {
+                requiredFeatures: ['immersive-ar'],
+                onSessionStarted: () => {
+                    console.log('AR session started');
+                },
+                onSessionEnded: () => {
+                    console.log('AR session ended');
+                }
+            });
+
+            // Append the AR button and start the session
+            document.body.appendChild(arButton);
+
+            // Initialize animation loop after AR session starts
             renderer.setAnimationLoop(() => {
                 if (renderer.xr.isPresenting) {
                     camera = renderer.xr.getCamera();
@@ -98,13 +104,10 @@
             });
         }
 
-        // Start the app on button click
-        document.getElementById('ar-button').addEventListener('click', () => {
-            arButton.requestSession();  // Start AR session
-        });
+        // Button event listener to start AR
+        document.getElementById('ar-button').addEventListener('click', startAR);
 
         init();
-        animate();
     </script>
 </body>
 </html>
