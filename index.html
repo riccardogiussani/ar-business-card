@@ -1,113 +1,132 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Simple AR WebApp</title>
-    <link type="text/css" rel="stylesheet" href="main.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AR Webpage</title>
     <style>
         body {
             margin: 0;
-            overflow: hidden;
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background-color: #f0f8ff;
+            padding-top: 50px;
         }
-        #landing-page {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            background: #ffffff;
-            z-index: 1000;
-        }
-        #ar-button {
-            padding: 10px 20px;
-            font-size: 16px;
+
+        /* Button styling */
+        button {
             background-color: #007bff;
             color: white;
+            font-size: 18px;
+            padding: 10px 20px;
             border: none;
             border-radius: 5px;
             cursor: pointer;
+            margin-top: 20px;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        button:disabled {
+            background-color: #d6d6d6;
+            color: #a1a1a1;
+            border: 1px solid #cccccc;
+            cursor: not-allowed;
+            opacity: 0.6;
         }
     </style>
 </head>
 <body>
-
-    <!-- Landing Page -->
-    <div id="landing-page">
-        <button id="ar-button">Start AR</button>
+    <div id="homepage">
+        <h1>Welcome to My AR Webpage</h1>
+        <p id="ar-support-status">Checking AR support...</p>
+        <button id="ar-btn" onclick="startARSession()" disabled>Start AR Session</button>
     </div>
 
-    <script type="importmap">
-        {
-            "imports": {
-                "three": "../build/three.module.js",
-                "three/addons/": "./jsm/"
+    <script>
+        let xrSession = null;
+        let gl = null;
+        let xrReferenceSpace = null;
+
+        function checkWebXRSupport() {
+            const arSupportStatus = document.getElementById("ar-support-status");
+            const arButton = document.getElementById("ar-btn");
+
+            if (navigator.xr) {
+                navigator.xr.isSessionSupported('immersive-ar').then((supported) => {
+                    if (supported) {
+                        console.log("AR is supported!");
+                        arSupportStatus.textContent = '✅ AR is supported on this device!';
+                        arButton.disabled = false;
+                    } else {
+                        console.log("AR is NOT supported.");
+                        arSupportStatus.textContent = '❌ AR is not supported on this device.';
+                        arButton.disabled = true;
+                    }
+                }).catch((err) => {
+                    console.error("Error checking AR support:", err);
+                    arSupportStatus.textContent = '❌ AR support check failed.';
+                    arButton.disabled = true;
+                });
+            } else {
+                console.log("WebXR is NOT supported.");
+                arSupportStatus.textContent = '❌ WebXR is not supported on this device.';
+                arButton.disabled = true;
             }
         }
-    </script>
 
-    <script type="module">
-        import * as THREE from 'three';
-        import { ARButton } from 'three/addons/webxr/ARButton.js';
+        async function startARSession() {
+            try {
+                const session = await navigator.xr.requestSession('immersive-ar', { requiredFeatures: ['local-floor'] });
+                xrSession = session;
 
-        let scene, camera, renderer, arButton;
+                // Create a canvas for AR rendering
+                const canvas = document.createElement('canvas');
+                document.body.appendChild(canvas);
+                gl = canvas.getContext('webgl', { xrCompatible: true });
 
-        // AR session and initialization
-        function init() {
-            scene = new THREE.Scene();
-            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-            renderer.setPixelRatio(window.devicePixelRatio);
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.xr.enabled = true;
+                // Create a WebXR rendering context
+                const xrLayer = new XRWebGLLayer(session, gl);
+                session.updateRenderState({ baseLayer: xrLayer });
 
-            // Event listener for window resize
-            window.addEventListener('resize', onWindowResize);
+                // Get reference space
+                xrReferenceSpace = await session.requestReferenceSpace('local-floor');
+
+                // Handle AR session end
+                session.addEventListener('end', () => {
+                    console.log("AR session ended.");
+                    document.body.removeChild(canvas);
+                    xrSession = null;
+                });
+
+                // Start rendering loop
+                session.requestAnimationFrame(onXRFrame);
+
+                console.log("AR session started!");
+            } catch (error) {
+                console.error("Failed to start AR session:", error);
+            }
         }
 
-        // Handle window resizing
-        function onWindowResize() {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
+        function onXRFrame(time, frame) {
+            if (!xrSession) return;
+            let session = frame.session;
+            let glLayer = session.renderState.baseLayer;
+
+            const pose = frame.getViewerPose(xrReferenceSpace);
+            if (pose) {
+                let gl = glLayer.context;
+                gl.bindFramebuffer(gl.FRAMEBUFFER, glLayer.framebuffer);
+                gl.clearColor(0.0, 0.0, 0.0, 0.0);
+                gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+            }
+
+            session.requestAnimationFrame(onXRFrame);
         }
 
-        // Start the AR session after button click
-        function startAR() {
-            // Remove the landing page
-            document.getElementById('landing-page').style.display = 'none';
-
-            // Create the AR button for starting the session
-            arButton = ARButton.createButton(renderer, {
-                requiredFeatures: ['immersive-ar'],
-                onSessionStarted: () => {
-                    console.log('AR session started');
-                },
-                onSessionEnded: () => {
-                    console.log('AR session ended');
-                }
-            });
-
-            // Append the AR button and start the session
-            document.body.appendChild(arButton);
-
-            // Initialize animation loop after AR session starts
-            renderer.setAnimationLoop(() => {
-                if (renderer.xr.isPresenting) {
-                    camera = renderer.xr.getCamera();
-                    scene.add(camera);
-                }
-                renderer.render(scene, camera);
-            });
-        }
-
-        // Button event listener to start AR
-        document.getElementById('ar-button').addEventListener('click', startAR);
-
-        init();
+        checkWebXRSupport();
     </script>
 </body>
 </html>
