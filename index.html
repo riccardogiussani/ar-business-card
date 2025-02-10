@@ -8,6 +8,8 @@
 </head>
 <body>
 
+    <button id="start-ar">Start AR</button>
+
     <script type="importmap">
         {
             "imports": {
@@ -20,26 +22,29 @@
     <script type="module">
 
         import * as THREE from 'three';
-        import { ARButton } from 'three/addons/webxr/ARButton.js';
 
         let camera, scene, renderer;
 
         init();
 
         function init() {
-            
             scene = new THREE.Scene();
-
             camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
-
+            
             renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
             renderer.setPixelRatio(window.devicePixelRatio);
             renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.setAnimationLoop(animate);
             renderer.xr.enabled = true;
             document.body.appendChild(renderer.domElement);
 
-            document.body.appendChild(ARButton.createButton(renderer));
+            document.getElementById('start-ar').addEventListener('click', async () => {
+                if (navigator.xr && await navigator.xr.isSessionSupported('immersive-ar')) {
+                    const session = await navigator.xr.requestSession('immersive-ar');
+                    renderer.xr.setSession(session);
+                } else {
+                    alert('AR not supported on this device');
+                }
+            });
 
             window.addEventListener('resize', onWindowResize);
         }
@@ -51,9 +56,10 @@
         }
 
         function animate() {
-            renderer.render(scene, camera);
+            renderer.setAnimationLoop(() => {
+                renderer.render(scene, camera);
+            });
         }
-
     </script>
 </body>
 </html>
