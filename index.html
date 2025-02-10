@@ -13,6 +13,7 @@
             padding-top: 50px;
         }
 
+        /* Button styling */
         button {
             background-color: #007bff;
             color: white;
@@ -48,8 +49,6 @@
         let xrSession = null;
         let gl = null;
         let xrReferenceSpace = null;
-        let canvas = null;
-        let xrAnimationFrameRequest = null; 
 
         function checkWebXRSupport() {
             const arSupportStatus = document.getElementById("ar-support-status");
@@ -83,20 +82,12 @@
                 const session = await navigator.xr.requestSession('immersive-ar', { requiredFeatures: ['local-floor'] });
                 xrSession = session;
 
-                // Create a WebGL-compatible canvas
-                canvas = document.createElement('canvas');
+                // Create a canvas for AR rendering
+                const canvas = document.createElement('canvas');
                 document.body.appendChild(canvas);
                 gl = canvas.getContext('webgl', { xrCompatible: true });
 
-                // Handle WebGL context lost (Fix for freezing issues)
-                canvas.addEventListener('webglcontextlost', (event) => {
-                    event.preventDefault();
-                    console.error("WebGL context lost! Restarting AR session...");
-                    endARSession();
-                    startARSession();
-                });
-
-                // Create an XR WebGL Layer
+                // Create a WebXR rendering context
                 const xrLayer = new XRWebGLLayer(session, gl);
                 session.updateRenderState({ baseLayer: xrLayer });
 
@@ -106,30 +97,12 @@
                 // Handle AR session end
                 session.addEventListener('end', () => {
                     console.log("AR session ended.");
-                    endARSession();
+                    document.body.removeChild(canvas);
+                    xrSession = null;
                 });
 
                 // Start rendering loop
-                function onXRFrame(time, frame) {
-                    if (!xrSession) return;
-
-                    let session = frame.session;
-                    let glLayer = session.renderState.baseLayer;
-
-                    const pose = frame.getViewerPose(xrReferenceSpace);
-                    if (pose) {
-                        let gl = glLayer.context;
-                        gl.bindFramebuffer(gl.FRAMEBUFFER, glLayer.framebuffer);
-                        gl.clearColor(0.0, 0.0, 0.0, 0.0);
-                        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-                    }
-
-                    // Keep rendering frames
-                    xrAnimationFrameRequest = session.requestAnimationFrame(onXRFrame);
-                }
-
-                // Start animation loop
-                xrAnimationFrameRequest = session.requestAnimationFrame(onXRFrame);
+                session.requestAnimationFrame(onXRFrame);
 
                 console.log("AR session started!");
             } catch (error) {
@@ -137,20 +110,20 @@
             }
         }
 
-        function endARSession() {
-            if (xrSession) {
-                xrSession.end();
-                xrSession = null;
+        function onXRFrame(time, frame) {
+            if (!xrSession) return;
+            let session = frame.session;
+            let glLayer = session.renderState.baseLayer;
+
+            const pose = frame.getViewerPose(xrReferenceSpace);
+            if (pose) {
+                let gl = glLayer.context;
+                gl.bindFramebuffer(gl.FRAMEBUFFER, glLayer.framebuffer);
+                gl.clearColor(0.0, 0.0, 0.0, 0.0);
+                gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
             }
-            if (canvas) {
-                document.body.removeChild(canvas);
-                canvas = null;
-            }
-            if (xrAnimationFrameRequest) {
-                cancelAnimationFrame(xrAnimationFrameRequest);
-                xrAnimationFrameRequest = null;
-            }
-            console.log("AR session cleaned up.");
+
+            session.requestAnimationFrame(onXRFrame);
         }
 
         checkWebXRSupport();
