@@ -49,7 +49,7 @@
         let gl = null;
         let xrReferenceSpace = null;
         let canvas = null;
-        let xrAnimationFrameRequest = null; // Store animation frame request
+        let xrAnimationFrameRequest = null; 
 
         function checkWebXRSupport() {
             const arSupportStatus = document.getElementById("ar-support-status");
@@ -91,8 +91,9 @@
                 // Handle WebGL context lost (Fix for freezing issues)
                 canvas.addEventListener('webglcontextlost', (event) => {
                     event.preventDefault();
-                    console.error("WebGL context lost! Reloading session...");
+                    console.error("WebGL context lost! Restarting AR session...");
                     endARSession();
+                    startARSession();
                 });
 
                 // Create an XR WebGL Layer
@@ -109,30 +110,31 @@
                 });
 
                 // Start rendering loop
+                function onXRFrame(time, frame) {
+                    if (!xrSession) return;
+
+                    let session = frame.session;
+                    let glLayer = session.renderState.baseLayer;
+
+                    const pose = frame.getViewerPose(xrReferenceSpace);
+                    if (pose) {
+                        let gl = glLayer.context;
+                        gl.bindFramebuffer(gl.FRAMEBUFFER, glLayer.framebuffer);
+                        gl.clearColor(0.0, 0.0, 0.0, 0.0);
+                        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+                    }
+
+                    // Keep rendering frames
+                    xrAnimationFrameRequest = session.requestAnimationFrame(onXRFrame);
+                }
+
+                // Start animation loop
                 xrAnimationFrameRequest = session.requestAnimationFrame(onXRFrame);
 
                 console.log("AR session started!");
             } catch (error) {
                 console.error("Failed to start AR session:", error);
             }
-        }
-
-        function onXRFrame(time, frame) {
-            if (!xrSession) return;
-
-            let session = frame.session;
-            let glLayer = session.renderState.baseLayer;
-
-            const pose = frame.getViewerPose(xrReferenceSpace);
-            if (pose) {
-                let gl = glLayer.context;
-                gl.bindFramebuffer(gl.FRAMEBUFFER, glLayer.framebuffer);
-                gl.clearColor(0.0, 0.0, 0.0, 0.0);
-                gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-            }
-
-            // Keep rendering frames
-            xrAnimationFrameRequest = session.requestAnimationFrame(onXRFrame);
         }
 
         function endARSession() {
