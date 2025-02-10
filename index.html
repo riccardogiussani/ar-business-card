@@ -1,147 +1,70 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simple AR Webpage</title>
-    <style>
-        body {
-            margin: 0;
-            font-family: Arial, sans-serif;
-            text-align: center;
-            background-color: #f0f8ff;
-        }
-
-        #homepage {
-            padding-top: 50px;
-        }
-
-        #ar-mode {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
-            background-color: black;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-direction: column;
-        }
-
-        button {
-            background-color: #007bff;
-            color: white;
-            font-size: 18px;
-            padding: 10px 20px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            margin-top: 20px;
-        }
-
-        button:hover {
-            background-color: #0056b3;
-        }
-
-        #exit-ar-btn {
-            position: absolute;
-            bottom: 20px;
-            background-color: red;
-        }
-
-        #exit-ar-btn:hover {
-            background-color: #8f1f1f;
-        }
-    </style>
+    <title>three.js ar - simple AR</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <link type="text/css" rel="stylesheet" href="main.css">
 </head>
 <body>
 
-    <div id="homepage">
-        <h1>Welcome to My Simple AR Webpage</h1>
-        <button id="ar-btn">Start AR Session</button>
+    <div id="info">
+        <a href="https://threejs.org" target="_blank" rel="noopener">three.js</a> ar - simple AR<br/>(Chrome Android 81+)
     </div>
 
-    <div id="ar-mode">
-        <button id="exit-ar-btn">Go Back</button>
-    </div>
-
-    <script type="module">
-        import * as THREE from 'three';
-
-        let renderer, scene, camera;
-        let xrSession = null;  // Store XR session
-
-        const arMode = document.getElementById("ar-mode");
-        const homepage = document.getElementById("homepage");
-        const arBtn = document.getElementById("ar-btn");
-        const exitBtn = document.getElementById("exit-ar-btn");
-
-        async function startAR() {
-            if (!navigator.xr) {
-                alert("WebXR not supported on this device.");
-                return;
-            }
-
-            try {
-                const supported = await navigator.xr.isSessionSupported('immersive-ar');
-                if (!supported) {
-                    alert("AR is not supported on this device.");
-                    return;
-                }
-
-                // Start the AR session
-                xrSession = await navigator.xr.requestSession('immersive-ar');
-
-                homepage.style.display = "none";
-                arMode.style.display = "block";
-
-                // Create Three.js renderer for AR mode
-                renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-                renderer.setSize(window.innerWidth, window.innerHeight);
-                renderer.xr.enabled = true;
-                arMode.appendChild(renderer.domElement);
-
-                scene = new THREE.Scene();
-                camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
-                scene.add(new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1));
-
-                xrSession.addEventListener("end", exitAR);
-
-                function renderLoop() {
-                    renderer.setAnimationLoop(() => {
-                        renderer.render(scene, camera);
-                    });
-                }
-
-                renderer.xr.setSession(xrSession);
-                renderLoop();
-
-            } catch (error) {
-                console.error("Failed to start AR session:", error);
-                alert("Error: " + error.message);
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "../build/three.module.js",
+                "three/addons/": "./jsm/"
             }
         }
-
-        function exitAR() {
-            if (xrSession) {
-                xrSession.end();
-                xrSession = null;
-            }
-
-            if (renderer) {
-                renderer.setAnimationLoop(null);
-                renderer.domElement.remove();
-            }
-
-            homepage.style.display = "block";
-            arMode.style.display = "none";
-        }
-
-        arBtn.addEventListener("click", startAR);
-        exitBtn.addEventListener("click", exitAR);
     </script>
 
+    <script type="module">
+
+        import * as THREE from 'three';
+        import { ARButton } from 'three/addons/webxr/ARButton.js';
+
+        let camera, scene, renderer;
+
+        init();
+
+        function init() {
+            
+            const container = document.createElement('div');
+            document.body.appendChild(container);
+
+            scene = new THREE.Scene();
+
+            camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
+
+            const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 3);
+            light.position.set(0.5, 1, 0.25);
+            scene.add(light);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setAnimationLoop(animate);
+            renderer.xr.enabled = true;
+            container.appendChild(renderer.domElement);
+
+            document.body.appendChild(ARButton.createButton(renderer));
+
+            window.addEventListener('resize', onWindowResize);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            renderer.render(scene, camera);
+        }
+
+    </script>
 </body>
 </html>
