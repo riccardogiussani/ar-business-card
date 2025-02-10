@@ -102,7 +102,7 @@
                 });
 
                 // Start rendering loop
-                //session.requestAnimationFrame(onXRFrame);
+                session.requestAnimationFrame(onXRFrame);
 
                 console.log("AR session started!");
             } catch (error) {
@@ -112,19 +112,22 @@
 
         function onXRFrame(time, frame) {
             if (!xrSession) return;
+
             let session = frame.session;
             let glLayer = session.renderState.baseLayer;
-
             const pose = frame.getViewerPose(xrReferenceSpace);
+
             if (pose) {
-                let gl = glLayer.context;
+                // Use the existing WebGL context
                 gl.bindFramebuffer(gl.FRAMEBUFFER, glLayer.framebuffer);
                 gl.clearColor(0.0, 0.0, 0.0, 0.0);
                 gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
             }
 
+            // Ensure the loop continues
             session.requestAnimationFrame(onXRFrame);
         }
+
 
         checkWebXRSupport();
     </script>
