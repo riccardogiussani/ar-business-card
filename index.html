@@ -45,6 +45,7 @@
         <button id="ar-btn" onclick="startARSession()" disabled>Start AR Session</button>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
     <script>
         let xrSession = null;
         let gl = null;
@@ -128,6 +129,24 @@
             session.requestAnimationFrame(onXRFrame);
         }
 
+        async function detectQRCode(frame) {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            // Get the camera image
+            const videoTexture = frame.getViewerPose(xrReferenceSpace); // Get the image (adjust based on your WebXR setup)
+            
+            if (videoTexture) {
+                ctx.drawImage(videoTexture, 0, 0, canvas.width, canvas.height);
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                
+                const code = jsQR(imageData.data, imageData.width, imageData.height);
+                if (code) {
+                    console.log("QR Code Detected:", code.data);
+                    // Do something with the QR code (e.g., place an AR object at its position)
+                }
+            }
+        }
 
         checkWebXRSupport();
     </script>
