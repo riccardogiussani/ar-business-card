@@ -3,152 +3,97 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AR Webpage</title>
+    <title>AR QR Code Detection</title>
     <style>
         body {
-            margin: 0;
             font-family: Arial, sans-serif;
             text-align: center;
             background-color: #f0f8ff;
             padding-top: 50px;
         }
 
-        /* Button styling */
-        button {
-            background-color: #007bff;
-            color: white;
-            font-size: 18px;
-            padding: 10px 20px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
+        #qr-result {
+            font-size: 24px;
+            color: #007bff;
             margin-top: 20px;
         }
 
-        button:hover {
-            background-color: #0056b3;
-        }
-
-        button:disabled {
-            background-color: #d6d6d6;
-            color: #a1a1a1;
-            border: 1px solid #cccccc;
-            cursor: not-allowed;
-            opacity: 0.6;
+        canvas {
+            display: none;
         }
     </style>
 </head>
 <body>
-    <div id="homepage">
-        <h1>Welcome to My AR Webpage</h1>
-        <p id="ar-support-status">Checking AR support...</p>
-        <button id="ar-btn" onclick="startARSession()" disabled>Start AR Session</button>
-    </div>
+    <h1>AR QR Code Detection</h1>
+    <p id="qr-result">QR Code not detected.</p>
 
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
     <script>
-        let xrSession = null;
-        let gl = null;
-        let xrReferenceSpace = null;
+        // Create an offscreen canvas for QR code detection
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        const qrResultText = document.getElementById('qr-result');
 
-        function checkWebXRSupport() {
-            const arSupportStatus = document.getElementById("ar-support-status");
-            const arButton = document.getElementById("ar-btn");
+        async function detectQRCode(frame) {
+            const pose = frame.getViewerPose(xrReferenceSpace); // Get the image (adjust based on your WebXR setup)
+            
+            if (pose) {
+                // Draw the current camera frame to the offscreen canvas
+                const videoTexture = pose.views[0].viewport;  // Get the camera feed or the texture
+                canvas.width = videoTexture.width;
+                canvas.height = videoTexture.height;
+                
+                // Here we simulate getting the video feed (adjust as needed for your WebXR setup)
+                ctx.drawImage(videoTexture, 0, 0, canvas.width, canvas.height);
+                
+                // Get the image data
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
-            if (navigator.xr) {
-                navigator.xr.isSessionSupported('immersive-ar').then((supported) => {
-                    if (supported) {
-                        console.log("AR is supported!");
-                        arSupportStatus.textContent = '✅ AR is supported on this device!';
-                        arButton.disabled = false;
-                    } else {
-                        console.log("AR is NOT supported.");
-                        arSupportStatus.textContent = '❌ AR is not supported on this device.';
-                        arButton.disabled = true;
-                    }
-                }).catch((err) => {
-                    console.error("Error checking AR support:", err);
-                    arSupportStatus.textContent = '❌ AR support check failed.';
-                    arButton.disabled = true;
-                });
-            } else {
-                console.log("WebXR is NOT supported.");
-                arSupportStatus.textContent = '❌ WebXR is not supported on this device.';
-                arButton.disabled = true;
+                // Use jsQR to detect the QR code in the image data
+                const code = jsQR(imageData.data, imageData.width, imageData.height);
+                
+                if (code) {
+                    // If QR code is detected, update the screen text
+                    qrResultText.textContent = `QR Code Detected: ${code.data}`;
+                } else {
+                    // If no QR code is detected, show a default message
+                    qrResultText.textContent = 'QR Code not detected.';
+                }
             }
+
+            // Continue checking for QR codes in the next frame
+            xrSession.requestAnimationFrame(detectQRCode);
         }
 
+        // Assuming you already have WebXR session setup
+        let xrSession = null;
         async function startARSession() {
             try {
                 const session = await navigator.xr.requestSession('immersive-ar', { requiredFeatures: ['local-floor'] });
                 xrSession = session;
 
-                // Create a canvas for AR rendering
+                // Setup WebGL or canvas for rendering
                 const canvas = document.createElement('canvas');
                 document.body.appendChild(canvas);
-                gl = canvas.getContext('webgl', { xrCompatible: true });
-
-                // Create a WebXR rendering context
+                const gl = canvas.getContext('webgl', { xrCompatible: true });
+                
                 const xrLayer = new XRWebGLLayer(session, gl);
                 session.updateRenderState({ baseLayer: xrLayer });
 
                 // Get reference space
-                xrReferenceSpace = await session.requestReferenceSpace('local-floor');
+                const xrReferenceSpace = await session.requestReferenceSpace('local-floor');
 
-                // Handle AR session end
-                session.addEventListener('end', () => {
-                    console.log("AR session ended.");
-                    document.body.removeChild(canvas);
-                    xrSession = null;
-                });
-
-                // Start rendering loop
-                session.requestAnimationFrame(onXRFrame);
-
+                // Start the QR code detection loop
+                session.requestAnimationFrame(detectQRCode);
+                
                 console.log("AR session started!");
             } catch (error) {
                 console.error("Failed to start AR session:", error);
             }
         }
 
-        function onXRFrame(time, frame) {
-            if (!xrSession) return;
-
-            let session = frame.session;
-            let glLayer = session.renderState.baseLayer;
-            const pose = frame.getViewerPose(xrReferenceSpace);
-
-            if (pose) {
-                // Use the existing WebGL context
-                gl.bindFramebuffer(gl.FRAMEBUFFER, glLayer.framebuffer);
-                gl.clearColor(0.0, 0.0, 0.0, 0.0);
-                gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-            }
-
-            // Ensure the loop continues
-            session.requestAnimationFrame(onXRFrame);
-        }
-
-        async function detectQRCode(frame) {
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            
-            // Get the camera image
-            const videoTexture = frame.getViewerPose(xrReferenceSpace); // Get the image (adjust based on your WebXR setup)
-            
-            if (videoTexture) {
-                ctx.drawImage(videoTexture, 0, 0, canvas.width, canvas.height);
-                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                
-                const code = jsQR(imageData.data, imageData.width, imageData.height);
-                if (code) {
-                    console.log("QR Code Detected:", code.data);
-                    // Do something with the QR code (e.g., place an AR object at its position)
-                }
-            }
-        }
-
-        checkWebXRSupport();
+        // Start the AR session when ready
+        startARSession();
     </script>
 </body>
 </html>
