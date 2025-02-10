@@ -168,13 +168,18 @@
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
             document.getElementById("ar-mode").appendChild(canvas);
-            const gl = canvas.getContext('webgl', { alpha: true });
+
+            // Create a WebGL context with XR compatibility
+            const gl = canvas.getContext('webgl', { alpha: true, xrCompatible: true });
+
             if (!gl) {
                 alert("WebGL not supported on this device.");
                 exitARSession();
             }
+
             return gl;
         }
+
 
         function exitARSession() {
             if (xrSession) {
